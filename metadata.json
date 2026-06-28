@@ -1,0 +1,6 @@
+{
+  "name": "Gangs with Balls",
+  "description": "A dynamic social platform providing street youth with opportunities to join local sports teams, complete quests, earn rewards, and connect with expert coaches and counselors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
