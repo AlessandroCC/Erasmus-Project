@@ -1,5 +1,6 @@
 import { Home, Map, MessageSquare, Trophy, Gift, User, Award, Flame } from 'lucide-react';
 import { UserProfile } from '../types';
+import gwbLogo from '../media/GwB-LOGO.jpeg';
 
 interface SidebarProps {
   currentTab: string;
@@ -22,8 +23,13 @@ export default function Sidebar({ currentTab, setCurrentTab, user, points }: Sid
     <aside id="app-sidebar" className="w-64 bg-black border-r border-lime-400/20 flex flex-col h-screen sticky top-0 text-zinc-300">
       {/* Brand Logo & Banner */}
       <div className="p-6 border-b border-lime-400/10 flex items-center gap-3 bg-black">
-        <div className="p-2 bg-lime-400 rounded-lg text-black animate-pulse shadow-[0_0_15px_#cfff04]">
-          <Flame size={24} className="fill-black" />
+        <div className="w-11 h-11 rounded-lg overflow-hidden border border-lime-400/30 shadow-[0_0_12px_rgba(207,255,4,0.25)] shrink-0 bg-[#0f172a]">
+          <img
+            src={gwbLogo}
+            alt="Gangs With Balls Logo"
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
         </div>
         <div>
           <h1 className="font-sans font-black tracking-tighter text-lg text-white uppercase leading-none">
@@ -115,12 +121,7 @@ export default function Sidebar({ currentTab, setCurrentTab, user, points }: Sid
         </button>
       </div>
 
-      {/* Footer Branding */}
-      <div className="p-4 border-t border-[#334155]/40 text-center">
-        <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest">
-          GWB Prototype v1.2
-        </p>
-      </div>
+
     </aside>
   );
 }
