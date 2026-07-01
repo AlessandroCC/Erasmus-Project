@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Volume2, Shield, Calendar, Users, Award, MapPin, ArrowRight, Sparkles, MessageSquare } from 'lucide-react';
 import { UserProfile } from '../types';
 import gwbLogo from '../media/GwB-LOGO.jpeg';
+import gwbVideo from '../media/Gangs_With_Balls(1).mp4';
 
 interface HomeViewProps {
   user: UserProfile;
@@ -21,38 +22,106 @@ const SUBTITLES = [
 
 export default function HomeView({ user, setCurrentTab, points }: HomeViewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [videoProgress, setVideoProgress] = useState(12); // starts mid-video
+  const [videoProgress, setVideoProgress] = useState(0);
   const [currentSubtitle, setCurrentSubtitle] = useState("Click play to hear from our mentors and youth");
-  
-  // Simulate video playback
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setVideoProgress((prev) => {
-          const next = prev >= 100 ? 0 : prev + 1;
-          
-          // Map percentage (0-100) to seconds (0-30 seconds video)
-          const currentSecond = Math.floor((next / 100) * 30);
-          const foundSubtitle = SUBTITLES.find(sub => currentSecond >= sub.time && currentSecond < sub.time + 4);
-          if (foundSubtitle) {
-            setCurrentSubtitle(foundSubtitle.text);
-          } else if (currentSecond >= 28) {
-            setCurrentSubtitle("Gangs with Balls: Join the Movement.");
-          } else {
-            setCurrentSubtitle("[Inspiring music continues]");
-          }
-          
-          return next;
-        });
-      }, 300);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+  const [showControls, setShowControls] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handlePlayToggle = () => {
-    setIsPlaying(!isPlaying);
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      videoRef.current.play().catch(err => console.log("Video play failed:", err));
+      setIsPlaying(true);
+    }
   };
+
+  const handleResetVideo = () => {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = 0;
+    videoRef.current.play().catch(err => console.log("Video play failed:", err));
+    setIsPlaying(true);
+  };
+
+  const handleTimeUpdate = () => {
+    if (!videoRef.current) return;
+    const current = videoRef.current.currentTime;
+    const duration = videoRef.current.duration || 30;
+    const percentage = (current / duration) * 100;
+    setVideoProgress(percentage);
+
+    const foundSubtitle = SUBTITLES.find(sub => current >= sub.time && current < sub.time + 4);
+    if (foundSubtitle) {
+      setCurrentSubtitle(foundSubtitle.text);
+    } else if (current >= duration - 2) {
+      setCurrentSubtitle("Gangs with Balls: Join the Movement.");
+    } else {
+      setCurrentSubtitle("[Inspiring music continues]");
+    }
+  };
+
+  const handleVideoEnded = () => {
+    setIsPlaying(false);
+    setVideoProgress(0);
+    setCurrentSubtitle("Click play to hear from our mentors and youth");
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    const duration = videoRef.current.duration || 0;
+    videoRef.current.currentTime = percentage * duration;
+    setVideoProgress(percentage * 100);
+  };
+
+  // Autohide controls when cursor is inactive for 1 second
+  const handleMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    if (isPlaying) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 1000);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isPlaying) {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      setShowControls(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isPlaying) {
+      setShowControls(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    } else {
+      setShowControls(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 1000);
+    }
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isPlaying]);
 
   const stats = [
     { label: 'Active Youth', value: '342', desc: 'Street kids in sports teams', icon: Users, color: 'text-lime-400 bg-lime-400/10' },
@@ -249,20 +318,27 @@ export default function HomeView({ user, setCurrentTab, points }: HomeViewProps)
           </div>
 
           {/* Interactive Simulated Video Frame */}
-          <div className="relative rounded-3xl overflow-hidden aspect-video max-h-[480px] bg-black border border-[#334155] group shadow-2xl">
-            {/* Custom simulated video preview graphics */}
-            {!isPlaying ? (
-              <div className="absolute inset-0 z-10 flex flex-col justify-between p-8 bg-gradient-to-t from-black via-black/40 to-black/60">
-                <div className="flex justify-between items-start">
-                  <span className="px-3 py-1 bg-red-600 font-mono text-xs font-bold text-white uppercase rounded-md shadow-md">
-                    Watch Trailer
-                  </span>
-                  <span className="text-xs font-mono text-zinc-300 font-bold bg-black/50 px-2.5 py-1 rounded-md backdrop-blur-sm">
-                    4:20 MINS
-                  </span>
-                </div>
+          <div 
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            className={`relative rounded-3xl overflow-hidden aspect-video max-h-[480px] bg-black border border-[#334155] group shadow-2xl transition-all duration-300 ${isPlaying && !showControls ? 'cursor-none' : ''}`}
+          >
+            {/* Real HTML5 Video element */}
+            <video
+              ref={videoRef}
+              src={gwbVideo}
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={handleVideoEnded}
+              onClick={handlePlayToggle}
+              className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+              playsInline
+              referrerPolicy="no-referrer"
+            />
 
-                <div className="flex flex-col items-center justify-center absolute inset-0">
+            {/* Custom video preview graphics / overlay */}
+            {!isPlaying ? (
+              <div className="absolute inset-0 z-10 flex flex-col justify-center items-center p-8 bg-gradient-to-t from-black/80 via-black/40 to-black/60">
+                <div className="flex flex-col items-center justify-center">
                   <button 
                     onClick={handlePlayToggle}
                     className="w-20 h-20 bg-lime-400 hover:bg-lime-300 text-black rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(163,230,53,0.5)] transition-all duration-300 hover:scale-110 cursor-pointer"
@@ -271,69 +347,37 @@ export default function HomeView({ user, setCurrentTab, points }: HomeViewProps)
                   </button>
                   <p className="mt-4 text-white text-sm font-bold uppercase tracking-wider drop-shadow-md">Play Project Documentary</p>
                 </div>
-
-                <div className="space-y-1">
-                  <h4 className="text-lg font-black text-white uppercase tracking-tight">"From the Pavement to the Podium"</h4>
-                  <p className="text-xs text-zinc-300 max-w-xl">Featuring stories from our champion players, coaches, and lead mental counselors who grew up in these very streets.</p>
-                </div>
               </div>
             ) : (
-              // Playing state animations/visualizations
-              <div className="absolute inset-0 z-10 flex flex-col justify-between p-6 bg-gradient-to-t from-black/90 via-black/20 to-black/80">
+              // Playing state animations/visualizations with auto-hide transitions
+              <div className={`absolute inset-0 z-10 flex flex-col justify-between p-6 bg-gradient-to-t from-black/90 via-black/20 to-black/80 pointer-events-none transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
                 {/* Upper bar with live details */}
-                <div className="flex justify-between items-center">
+                <div className={`flex justify-between items-center ${showControls ? 'pointer-events-auto' : 'pointer-events-none'}`}>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></span>
                     <span className="text-xs font-mono font-bold text-white uppercase">Stream Active - HD 1080p</span>
                   </div>
-                  <button 
-                    onClick={handlePlayToggle}
-                    className="text-xs text-zinc-400 hover:text-white bg-black/60 px-3 py-1 rounded border border-zinc-800"
-                  >
-                    Reset Video
-                  </button>
-                </div>
-
-                {/* Simulated Audio Spectrum & Center Visualizer */}
-                <div className="flex items-center justify-center flex-1">
-                  <div className="flex items-end gap-1.5 h-16">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((bar) => {
-                      // Generate random pulse heights for a vibrant street feel
-                      const animDelay = `${bar * 100}ms`;
-                      return (
-                        <div
-                          key={bar}
-                          className="w-1.5 bg-gradient-to-t from-lime-400 to-emerald-400 rounded-full animate-bounce"
-                          style={{
-                            height: `${20 + Math.sin(bar) * 60 + Math.random() * 20}%`,
-                            animationDuration: '0.8s',
-                            animationDelay: animDelay,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Subtitle Display Overlay */}
-                <div className="text-center bg-black/70 backdrop-blur-md px-6 py-3 rounded-xl border border-zinc-800 max-w-2xl mx-auto mb-4 animate-fade-in">
-                  <p className="text-sm text-lime-300 font-semibold italic tracking-wide">
-                    {currentSubtitle}
-                  </p>
                 </div>
 
                 {/* Bottom Custom Play Controls */}
-                <div className="bg-[#000000]/80 backdrop-blur-md p-4 rounded-2xl border border-[#334155]/60 flex items-center gap-4">
+                <div className={`bg-[#000000]/80 backdrop-blur-md p-4 rounded-2xl border border-[#334155]/60 flex items-center gap-4 ${showControls ? 'pointer-events-auto' : 'pointer-events-none'}`}>
                   <button 
                     onClick={handlePlayToggle}
                     className="p-2.5 bg-lime-400 rounded-xl text-black hover:bg-lime-300 transition-all cursor-pointer"
                   >
                     <Pause size={16} />
                   </button>
-                  <span className="text-xs text-zinc-400 font-mono">00:{videoProgress < 10 ? `0${Math.floor(videoProgress * 0.3)}` : Math.floor(videoProgress * 0.3)} / 00:30</span>
+                  <span className="text-xs text-zinc-400 font-mono">
+                    {videoRef.current 
+                      ? `${Math.floor(videoRef.current.currentTime / 60)}:${Math.floor(videoRef.current.currentTime % 60).toString().padStart(2, '0')} / ${Math.floor((videoRef.current.duration || 30) / 60)}:${Math.floor((videoRef.current.duration || 30) % 60).toString().padStart(2, '0')}`
+                      : "00:00 / 00:30"}
+                  </span>
                   
                   {/* Slider Progress Bar */}
-                  <div className="flex-1 h-1.5 bg-zinc-800 rounded-full relative overflow-hidden cursor-pointer">
+                  <div 
+                    onClick={handleProgressClick}
+                    className="flex-1 h-1.5 bg-zinc-800 rounded-full relative overflow-hidden cursor-pointer"
+                  >
                     <div 
                       className="h-full bg-lime-400 transition-all duration-300"
                       style={{ width: `${videoProgress}%` }}
@@ -342,16 +386,11 @@ export default function HomeView({ user, setCurrentTab, points }: HomeViewProps)
 
                   <div className="flex items-center gap-2 text-zinc-400">
                     <Volume2 size={16} />
-                    <span className="text-xs font-mono">85%</span>
+                    <span className="text-xs font-mono">100%</span>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Video Background Wallpaper Mock */}
-            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1519766304817-4f37bda74a27?auto=format&fit=crop&w=1200&h=720&q=80')` }}>
-              <div className="absolute inset-0 bg-zinc-950/70 mix-blend-multiply"></div>
-            </div>
           </div>
         </div>
 
